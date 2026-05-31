@@ -16,17 +16,17 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                echo 'Installing dependencies...'
-                sh 'npm install'
-            }
-        }
-
         stage('Automated Testing') {
             steps {
-                echo 'Running automated tests...'
-                sh 'npm test'
+                echo 'Running automated test...'
+                sh '''
+                if [ -f cicd-prject.html ]; then
+                    echo "Test Passed: cicd-prject.html file exists."
+                else
+                    echo "Test Failed: cicd-prject.html file does not exist."
+                    exit 1
+                fi
+                '''
             }
         }
 
@@ -40,18 +40,12 @@ pipeline {
 
         stage('Deployment') {
             steps {
-                echo 'Deploying application...'
+                echo 'Deploying application container...'
 
                 sh '''
-                if docker ps -a --format '{{.Names}}' | grep -w $OLD_CONTAINER_NAME; then
-                    docker rm -f $OLD_CONTAINER_NAME
-                fi
-
-                if docker ps -a --format '{{.Names}}' | grep -w $CONTAINER_NAME; then
-                    docker rename $CONTAINER_NAME $OLD_CONTAINER_NAME
-                fi
-
-                docker run -d -p 3000:3000 --name $CONTAINER_NAME $IMAGE_NAME:latest
+                docker rm -f $OLD_CONTAINER_NAME || true
+                docker rename $CONTAINER_NAME $OLD_CONTAINER_NAME || true
+                docker run -d -p 8081:80 --name $CONTAINER_NAME $IMAGE_NAME:latest
                 '''
             }
         }
@@ -63,13 +57,13 @@ pipeline {
                 sh '''
                 sleep 5
 
-                if curl -f http://localhost:3000/health; then
+                if curl -f http://localhost:8081; then
                     echo "Deployment successful. Application is healthy."
                 else
                     echo "Deployment failed. Starting rollback..."
-                    docker rm -f $CONTAINER_NAME
-                    docker rename $OLD_CONTAINER_NAME $CONTAINER_NAME
-                    docker start $CONTAINER_NAME
+                    docker rm -f $CONTAINER_NAME || true
+                    docker rename $OLD_CONTAINER_NAME $CONTAINER_NAME || true
+                    docker start $CONTAINER_NAME || true
                     exit 1
                 fi
                 '''
