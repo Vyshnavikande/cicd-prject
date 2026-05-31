@@ -52,13 +52,14 @@ pipeline {
 
         stage('Health Check') {
             steps {
-                echo 'Checking application health...'
+                echo 'Checking application health inside container...'
 
                 sh '''
                 sleep 5
 
-                if curl -f http://localhost:8081; then
+                if docker exec $CONTAINER_NAME wget -q -O- http://localhost > /dev/null; then
                     echo "Deployment successful. Application is healthy."
+                    docker rm -f $OLD_CONTAINER_NAME || true
                 else
                     echo "Deployment failed. Starting rollback..."
                     docker rm -f $CONTAINER_NAME || true
